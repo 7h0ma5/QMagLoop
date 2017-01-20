@@ -1,6 +1,7 @@
 #include "motorcontroller.h"
 #include <QDebug>
 #include <QSettings>
+#include <QSerialPortInfo>
 
 MotorController::MotorController(QObject* parent) : QObject(parent)
 {
@@ -12,12 +13,23 @@ MotorController::MotorController(QObject* parent) : QObject(parent)
     this->status.position = settings.value("motor/position", 0).value<int>();
     this->status.target = 0;
 
-    this->port = new QSerialPort("/dev/ttyACM0", this);
+    QList<QSerialPortInfo> list = QSerialPortInfo::availablePorts();
+
+    for (QSerialPortInfo info : list) {
+        qDebug() << info.portName();
+    }
+
+    this->port = new QSerialPort("COM3", this);
     this->port->setBaudRate(115200);
+    this->port->setReadBufferSize(512);
+
+    connect(this->port, SIGNAL(error(QSerialPort::SerialPortError)), this, SLOT(onError(QSerialPort::SerialPortError)));
+    connect(this->port, SIGNAL(readyRead()), this, SLOT(onReadData()));
 
     if (this->port->open(QIODevice::ReadWrite)) {
+        qDebug() << "connected" << this->port->readBufferSize();
         this->status.connected = true;
-        connect(this->port, SIGNAL(readyRead()), this, SLOT(onReadData()));
+
     }
     else {
         qDebug() << this->port->error();
@@ -51,6 +63,7 @@ MotorStatus MotorController::getStatus() {
 }
 
 void MotorController::onReadData() {
+    qDebug() << "onReadData";
     while (this->port->canReadLine()) {
         QByteArray data = this->port->readLine().trimmed();
         QList<QByteArray> params = data.split(';');
@@ -79,4 +92,8 @@ void MotorController::onReadData() {
 
         emit statusChanged(this->status);
     }
+}
+
+void MotorController::onError(QSerialPort::SerialPortError error) {
+    qDebug() << error;
 }

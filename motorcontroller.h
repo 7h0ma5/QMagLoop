@@ -31,6 +31,7 @@ public:
 
 private slots:
     void onReadData();
+    void onError(QSerialPort::SerialPortError error);
 
 signals:
     void statusChanged(MotorStatus);
